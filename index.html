@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.11.7/video-js.min.css"
+      rel="stylesheet"
+    />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.11.7/video.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-eme@3.8.0/dist/videojs-contrib-eme.js"></script>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      .vjs-segment {
+        position: absolute;
+        height: 5px;
+        background-color: red;
+        top: 0px;
+        cursor: pointer;
+      }
+
+      .tooltip {
+        position: absolute;
+        background-color: black;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        visibility: hidden;
+        opacity: 0;
+        transition: visibility 0s, opacity 0.5s linear;
+      }
+
+      .tooltip.show {
+        visibility: visible;
+        opacity: 1;
+      }
+    </style>
+
+    <title>Test VideJS DRM</title>
+  </head>
+  <body>
+    <div style="margin: 50px auto">
+      <video
+        id="my-video"
+        class="video-js vjs-default-skin"
+        controls
+        preload="auto"
+        width="640"
+        height="264"
+      >
+        <source src="YOUR_VIDEO_SOURCE.mp4" type="video/mp4" />
+      </video>
+    </div>
+
+    <div >
+      <button onclick="scrollToSegment(0)">Segment 1</button>
+      <button onclick="scrollToSegment(1)">Segment 2</button>
+    </div>
+
+    <script>
+      var segments = [
+        { start: 10, end: 20, description: "First Segment Description" },
+        { start: 30, end: 60, description: "Second Segment Description" },
+      ];
+      var player = videojs(
+        "my-video",
+        {
+          controls: true,
+          fluid: true,
+          html5: {
+            vhs: {
+              overrideNative: true,
+            },
+          },
+        },
+        function () {
+          var player = this;
+          player.eme();
+          player.src({
+            src: "https://cdn.bitmovin.com/content/assets/art-of-motion_drm/mpds/11331.mpd",
+            type: "application/dash+xml",
+            keySystems: {
+              "com.widevine.alpha":
+                "https://cwip-shaka-proxy.appspot.com/no_auth",
+            },
+          });
+
+          player.ready(function () {
+            player.tech(true).on("keystatuschange", function (event) {
+              console.log("event: ", event);
+            });
+            var playerWidth = player.currentWidth();
+            var duration = player.duration();
+
+            player.on("loadedmetadata", function () {
+              var playerWidth = player.currentWidth();
+              var duration = player.duration();
+
+              segments.forEach(function (segment) {
+                var segmentDiv = document.createElement("div");
+                segmentDiv.classList.add("vjs-segment");
+
+                var startRatio = segment.start / duration;
+                var endRatio = segment.end / duration;
+                var segmentWidth = (endRatio - startRatio) * playerWidth;
+
+                segmentDiv.style.left = startRatio * 100 + "%";
+                segmentDiv.style.width = segmentWidth + "px";
+
+                // Tooltip creation
+                var tooltip = document.createElement("div");
+                tooltip.classList.add("tooltip");
+                tooltip.textContent = segment.description; // Add your segment description here
+                document.body.appendChild(tooltip); // Append tooltip to body
+
+                // Show tooltip on hover
+                segmentDiv.addEventListener("mouseover", function (event) {
+                  tooltip.classList.add("show");
+                  var rect = event.target.getBoundingClientRect();
+                  var tooltipWidth = tooltip.offsetWidth;
+                  var tooltipHeight = tooltip.offsetHeight;
+
+                  // Positioning tooltip
+                  tooltip.style.left =
+                    rect.left +
+                    window.scrollX +
+                    rect.width / 2 -
+                    tooltipWidth / 2 +
+                    "px";
+                  tooltip.style.top =
+                    rect.top + window.scrollY - tooltipHeight - 10 + "px"; // 10px above the segment
+                });
+
+                // Hide tooltip on mouseout
+                segmentDiv.addEventListener("mouseout", function () {
+                  tooltip.classList.remove("show");
+                });
+
+                player.controlBar.progressControl.el().appendChild(segmentDiv);
+              });
+            });
+          });
+        }
+      );
+
+      function scrollToSegment(segmentIndex) {
+        if (segmentIndex >= 0 && segmentIndex < segments.length) {
+          var segment = segments[segmentIndex];
+          player.currentTime(segment.start);
+        }
+      }
+      scrollToSegment(0);
+    </script>
+  </body>
+</html>
